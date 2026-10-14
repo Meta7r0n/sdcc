@@ -1,0 +1,1602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STICK-OPS // SCENE SCRUBBER v1.04 (2002)</title>
+<style>
+    * {
+        box-sizing: border-box;
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        background-color: #050505;
+        background-image: 
+            radial-gradient(circle at center, #150505 0%, #000000 85%),
+            repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 2px);
+        color: #ccc;
+        font-family: Verdana, Tahoma, Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        overflow-x: hidden;
+    }
+
+    /* Early-2000s Web Portal Wrapper */
+    #portal-wrapper {
+        width: 824px;
+        background: #111;
+        border: 3px outset #444;
+        box-shadow: 0 0 40px rgba(180, 0, 0, 0.35), inset 0 0 10px #000;
+        padding: 8px;
+    }
+
+    #portal-header {
+        background: linear-gradient(90deg, #3a0000, #0a0a0a 50%, #3a0000);
+        border: 2px inset #333;
+        padding: 6px 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+    }
+
+    .portal-title {
+        font-family: Impact, 'Arial Black', sans-serif;
+        font-size: 22px;
+        letter-spacing: 2px;
+        color: #ff1111;
+        text-shadow: 2px 2px 0px #000, 0 0 8px #ff0000;
+    }
+
+    .portal-sub {
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        color: #00ff00;
+        font-weight: bold;
+    }
+
+    #audio-btn {
+        background: #222;
+        color: #00ff00;
+        border: 2px outset #555;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        font-weight: bold;
+        padding: 4px 10px;
+        cursor: pointer;
+    }
+
+    #audio-btn:active {
+        border-style: inset;
+    }
+
+    #canvas-frame {
+        border: 4px inset #2a2a2a;
+        background: #000;
+        line-height: 0;
+        position: relative;
+    }
+
+    canvas {
+        display: block;
+        cursor: none; /* Uses custom Flash-style vector cursor */
+    }
+
+    #portal-footer {
+        margin-top: 6px;
+        background: #0a0a0a;
+        border: 2px inset #222;
+        padding: 5px 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 11px;
+        color: #777;
+        font-family: 'Courier New', monospace;
+    }
+
+    .retro-badge {
+        color: #ffcc00;
+        font-weight: bold;
+    }
+</style>
+</head>
+<body>
+
+<div id="portal-wrapper">
+    <div id="portal-header">
+        <div>
+            <span class="portal-title">STICK-OPS.NET</span>
+            <span class="portal-sub"> // CONTRACT: SAFEHOUSE SCRUBBER</span>
+        </div>
+        <button id="audio-btn">SFX: ON</button>
+    </div>
+
+    <div id="canvas-frame">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+    </div>
+
+    <div id="portal-footer">
+        <span>[L-CLICK] Interact / Use Tool &nbsp;|&nbsp; [R-CLICK] Unequip Tool</span>
+        <span class="retro-badge">FLASH-VEC ENGINE v2.4 // EST. 2002</span>
+    </div>
+</div>
+
+<script>
+/**
+ * ============================================================================
+ * SCENE SCRUBBER - SINGLE-FILE HOMAGE TO EARLY-2000s FLASH POINT-AND-CLICK GAMES
+ * 100% Original Code, Procedural Vector Art & Web Audio Synthesizer
+ * ============================================================================
+ */
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Prevent right-click menu on canvas so right-click can unequip items
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// --- WEB AUDIO SYNTHESIZER (Zero External Assets Required) ---
+const SFX = {
+    ctx: null,
+    muted: false,
+    init() {
+        if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            this.ctx = new AudioCtx();
+        }
+        if (this.ctx.state === 'suspended') {
+            this.ctx.resume();
+        }
+    },
+    play(type) {
+        if (this.muted) return;
+        this.init();
+        const now = this.ctx.currentTime;
+
+        if (type === 'click') {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(600, now);
+            osc.frequency.exponentialRampToValueAtTime(150, now + 0.04);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.linearRampToValueAtTime(0.01, now + 0.04);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.04);
+        }
+        else if (type === 'pickup') {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(300, now);
+            osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.12);
+        }
+        else if (type === 'error') {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(110, now);
+            osc.frequency.setValueAtTime(85, now + 0.08);
+            gain.gain.setValueAtTime(0.18, now);
+            gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.2);
+        }
+        else if (type === 'scrub' || type === 'bag') {
+            // Filtered white noise burst
+            const bufferSize = this.ctx.sampleRate * 0.25;
+            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(type === 'scrub' ? 1200 : 400, now);
+            filter.frequency.linearRampToValueAtTime(type === 'scrub' ? 600 : 180, now + 0.25);
+
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(0.25, now);
+            gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.ctx.destination);
+            noise.start(now);
+        }
+        else if (type === 'crowbar') {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(220, now);
+            osc.frequency.exponentialRampToValueAtTime(55, now + 0.25);
+            gain.gain.setValueAtTime(0.25, now);
+            gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.25);
+        }
+        else if (type === 'burn') {
+            const bufferSize = this.ctx.sampleRate * 0.45;
+            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = buffer;
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(350, now);
+
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(0.35, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.ctx.destination);
+            noise.start(now);
+        }
+        else if (type === 'siren') {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(650, now);
+            osc.frequency.linearRampToValueAtTime(950, now + 0.35);
+            osc.frequency.linearRampToValueAtTime(650, now + 0.7);
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.linearRampToValueAtTime(0.01, now + 0.7);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.7);
+        }
+        else if (type === 'win') {
+            [220, 277, 330, 440].forEach((freq, idx) => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+                gain.gain.setValueAtTime(0.15, now + idx * 0.08);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.35);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now + idx * 0.08);
+                osc.stop(now + idx * 0.08 + 0.35);
+            });
+        }
+    }
+};
+
+document.getElementById('audio-btn').addEventListener('click', (e) => {
+    SFX.muted = !SFX.muted;
+    e.target.textContent = SFX.muted ? "SFX: MUTED" : "SFX: ON";
+    e.target.style.color = SFX.muted ? "#ff3333" : "#00ff00";
+});
+
+// --- INPUT STATE ---
+const Input = {
+    x: 400,
+    y: 300,
+    leftClick: false,
+    rightClick: false,
+    hovered: null
+};
+
+canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    Input.x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    Input.y = (e.clientY - rect.top) * (canvas.height / rect.height);
+});
+
+canvas.addEventListener('mousedown', e => {
+    SFX.init();
+    if (e.button === 0) Input.leftClick = true;
+    if (e.button === 2) Input.rightClick = true;
+});
+
+// --- GLOBAL GAME STATE ---
+const Game = {
+    state: 'MENU', // MENU, BRIEFING, PLAYING, GAMEOVER, VICTORY
+    failReason: '',
+    currentRoom: 'hallway',
+    timeLeft: 180,
+    score: 0,
+    heat: 0, // 0 to 100 Police Suspicion
+    patrolTimer: 28, // Countdown until police cruiser drives past
+    patrolActive: 0,
+    blindsClosed: false,
+    basementUnlocked: false,
+    safeOpened: false,
+    mopDirtiness: 0, // Max 2 before needing a rinse in the sink
+    inventory: [],
+    selectedItem: null,
+    caption: "Contract active. Grab tools and start scrubbing.",
+    captionTimer: 4,
+    captionColor: "#ffff00",
+    animTime: 0,
+    bloodDrips: Array.from({length: 18}, () => ({
+        x: Math.random() * 800,
+        y: Math.random() * 60,
+        speed: 25 + Math.random() * 60,
+        len: 20 + Math.random() * 80
+    }))
+};
+
+function setCaption(text, color = "#ffff00", duration = 3.5) {
+    Game.caption = text;
+    Game.captionColor = color;
+    Game.captionTimer = duration;
+}
+
+function addItem(item) {
+    if (!Game.inventory.some(i => i.id === item.id)) {
+        Game.inventory.push(item);
+    }
+}
+
+function removeItem(id) {
+    Game.inventory = Game.inventory.filter(i => i.id !== id);
+    if (Game.selectedItem && Game.selectedItem.id === id) {
+        Game.selectedItem = null;
+    }
+}
+
+// --- PROCEDURAL VECTOR PROP & STICK-FIGURE ARTISTS ---
+const Art = {
+    // Draws a classic slumped stick figure corpse with X eyes
+    drawDeadStick(ctx, x, y, pose = 1, stickColor = '#000000') {
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Arterial puddle underneath
+        ctx.fillStyle = '#7a0000';
+        ctx.beginPath();
+        ctx.ellipse(x + 45, y + 72, 48, 16, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#400000';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Stick Limbs & Torso
+        ctx.strokeStyle = stickColor;
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        if (pose === 1) {
+            // Slumped against wall
+            ctx.moveTo(x + 40, y + 32); ctx.lineTo(x + 35, y + 65); // Torso
+            ctx.moveTo(x + 38, y + 40); ctx.lineTo(x + 12, y + 68); // L Arm
+            ctx.moveTo(x + 38, y + 40); ctx.lineTo(x + 65, y + 60); // R Arm
+            ctx.moveTo(x + 35, y + 65); ctx.lineTo(x + 10, y + 82); // L Leg
+            ctx.moveTo(x + 35, y + 65); ctx.lineTo(x + 75, y + 78); // R Leg
+        } else {
+            // Face-down sprawled
+            ctx.moveTo(x + 25, y + 45); ctx.lineTo(x + 65, y + 55); // Torso
+            ctx.moveTo(x + 32, y + 47); ctx.lineTo(x + 15, y + 25); // Arm 1
+            ctx.moveTo(x + 32, y + 47); ctx.lineTo(x + 45, y + 75); // Arm 2
+            ctx.moveTo(x + 65, y + 55); ctx.lineTo(x + 90, y + 40); // Leg 1
+            ctx.moveTo(x + 65, y + 55); ctx.lineTo(x + 88, y + 75); // Leg 2
+        }
+        ctx.stroke();
+
+        // Head
+        const hx = pose === 1 ? x + 42 : x + 18;
+        const hy = pose === 1 ? y + 18 : y + 42;
+        ctx.fillStyle = '#e8e8e8';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.arc(hx, hy, 14, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Dead 'X' Eyes
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#900';
+        ctx.beginPath();
+        ctx.moveTo(hx - 7, hy - 4); ctx.lineTo(hx - 2, hy + 2);
+        ctx.moveTo(hx - 2, hy - 4); ctx.lineTo(hx - 7, hy + 2);
+        ctx.moveTo(hx + 2, hy - 4); ctx.lineTo(hx + 7, hy + 2);
+        ctx.moveTo(hx + 7, hy - 4); ctx.lineTo(hx + 2, hy + 2);
+        ctx.stroke();
+
+        // Animated Buzzing Flies
+        ctx.fillStyle = '#00ff00';
+        for (let i = 0; i < 3; i++) {
+            const fx = hx + Math.sin(Game.animTime * 6 + i * 2) * 22;
+            const fy = hy - 10 + Math.cos(Game.animTime * 8 + i * 3) * 12;
+            ctx.fillRect(fx, fy, 2.5, 2.5);
+        }
+        ctx.restore();
+    },
+
+    drawBloodSplatter(ctx, x, y, w, h, seed = 1) {
+        ctx.save();
+        ctx.fillStyle = '#8b0000';
+        ctx.strokeStyle = '#4a0000';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.ellipse(x + w/2, y + h/2, w/2, h/2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Sub-droplets
+        ctx.beginPath();
+        ctx.arc(x + w * 0.15, y + h * 0.2, 6, 0, Math.PI * 2);
+        ctx.arc(x + w * 0.85, y + h * 0.75, 8, 0, Math.PI * 2);
+        ctx.arc(x + w * 0.75, y + h * 0.15, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    },
+
+    drawBulletHoles(ctx, x, y, w, h) {
+        ctx.save();
+        const pts = [[15, 18], [38, 12], [26, 35], [55, 28], [45, 48]];
+        pts.forEach(([px, py]) => {
+            // Plaster cracks
+            ctx.strokeStyle = '#111';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(x + px - 10, y + py - 6); ctx.lineTo(x + px + 10, y + py + 6);
+            ctx.moveTo(x + px + 6, y + py - 10); ctx.lineTo(x + px - 6, y + py + 10);
+            ctx.stroke();
+            // Dark impact hole
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(x + px, y + py, 4.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#777';
+            ctx.stroke();
+        });
+        ctx.restore();
+    },
+
+    drawBodyBagFloor(ctx, x, y, w, h) {
+        ctx.save();
+        ctx.fillStyle = '#181818';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(x + w/2, y + h/2, w/2, h/2.2, -0.1, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        // Yellow zipper line & tag
+        ctx.strokeStyle = '#aa9900';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x + 12, y + h/2);
+        ctx.lineTo(x + w - 12, y + h/2 - 4);
+        ctx.stroke();
+        ctx.fillStyle = '#cc0000';
+        ctx.fillRect(x + w - 18, y + h/2 - 12, 10, 6);
+        ctx.restore();
+    },
+
+    drawIcon(ctx, id, x, y, size = 40) {
+        ctx.save();
+        ctx.translate(x, y);
+        const s = size / 40;
+        ctx.scale(s, s);
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#000';
+
+        if (id === 'mop') {
+            // Handle
+            ctx.strokeStyle = '#c89d54';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(8, 32); ctx.lineTo(32, 6);
+            ctx.stroke();
+            // Mop head (turns red when dirty!)
+            ctx.fillStyle = Game.mopDirtiness >= 2 ? '#990000' : (Game.mopDirtiness === 1 ? '#aa6666' : '#dcdcdc');
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(10, 30, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+        }
+        else if (id === 'bags') {
+            ctx.fillStyle = '#1c1c1c';
+            ctx.strokeStyle = '#555';
+            ctx.fillRect(6, 8, 28, 26);
+            ctx.strokeRect(6, 8, 28, 26);
+            ctx.fillStyle = '#ffcc00';
+            ctx.font = 'bold 8px Arial';
+            ctx.fillText('BIO', 11, 24);
+        }
+        else if (id === 'crowbar') {
+            ctx.strokeStyle = '#cc2222';
+            ctx.lineWidth = 4.5;
+            ctx.beginPath();
+            ctx.moveTo(8, 34);
+            ctx.lineTo(28, 10);
+            ctx.arc(31, 13, 5, Math.PI * 1.1, Math.PI * 0.2, false);
+            ctx.stroke();
+        }
+        else if (id === 'spackle') {
+            ctx.fillStyle = '#eee';
+            ctx.strokeStyle = '#333';
+            ctx.fillRect(8, 14, 24, 20);
+            ctx.strokeRect(8, 14, 24, 20);
+            ctx.fillStyle = '#ff3300';
+            ctx.fillRect(8, 18, 24, 8);
+            // Putty knife
+            ctx.fillStyle = '#aaa';
+            ctx.fillRect(16, 4, 8, 10);
+        }
+        else if (id === 'key') {
+            ctx.strokeStyle = '#ffcc00';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(12, 20, 6, 0, Math.PI * 2);
+            ctx.moveTo(18, 20); ctx.lineTo(35, 20);
+            ctx.moveTo(28, 20); ctx.lineTo(28, 26);
+            ctx.moveTo(33, 20); ctx.lineTo(33, 26);
+            ctx.stroke();
+        }
+        else if (id === 'filled_bag') {
+            ctx.fillStyle = '#151515';
+            ctx.strokeStyle = '#aa0000';
+            ctx.beginPath();
+            ctx.ellipse(20, 22, 15, 11, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#ff0000';
+            ctx.font = 'bold 8px Courier';
+            ctx.fillText('BODY', 9, 25);
+        }
+        else if (id === 'contraband') {
+            ctx.fillStyle = '#c2a675';
+            ctx.strokeStyle = '#000';
+            ctx.fillRect(6, 12, 28, 18);
+            ctx.strokeRect(6, 12, 28, 18);
+            ctx.strokeStyle = '#900';
+            ctx.strokeRect(10, 15, 20, 12);
+        }
+        ctx.restore();
+    }
+};
+
+// --- ROOM DEFINITIONS & HOTSPOTS ---
+let Rooms = {};
+
+function initRooms() {
+    Rooms = {
+        hallway: {
+            name: "MAIN CORRIDOR",
+            bgDraw(ctx) {
+                // Grimy green-grey wallpaper
+                ctx.fillStyle = '#293026';
+                ctx.fillRect(0, 0, 800, 390);
+                // Wallpaper stripes
+                ctx.strokeStyle = '#222820';
+                ctx.lineWidth = 2;
+                for (let x = 20; x < 800; x += 40) {
+                    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 390); ctx.stroke();
+                }
+                // Floor
+                ctx.fillStyle = '#231914';
+                ctx.fillRect(0, 390, 800, 90);
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(0, 390); ctx.lineTo(800, 390); ctx.stroke();
+
+                // Flickering overhead bulb
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.moveTo(400, 0); ctx.lineTo(400, 45); ctx.stroke();
+                const flicker = Math.random() > 0.06 ? '#ffff99' : '#666633';
+                ctx.fillStyle = flicker;
+                ctx.beginPath(); ctx.arc(400, 52, 9, 0, Math.PI * 2); ctx.fill();
+                ctx.stroke();
+            },
+            hotspots: [
+                {
+                    id: 'door_bath', type: 'door', x: 45, y: 115, w: 95, h: 275, target: 'bathroom',
+                    label: 'DOOR -> BATHROOM',
+                    draw(ctx) {
+                        ctx.fillStyle = '#382a1e'; ctx.fillRect(this.x, this.y, this.w, this.h);
+                        ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeRect(this.x, this.y, this.w, this.h);
+                        ctx.fillStyle = '#aa8833'; ctx.beginPath(); ctx.arc(this.x + 80, this.y + 145, 5, 0, Math.PI*2); ctx.fill();
+                    }
+                },
+                {
+                    id: 'door_living', type: 'door', x: 660, y: 115, w: 95, h: 275, target: 'livingroom',
+                    label: 'DOOR -> LIVING ROOM',
+                    draw(ctx) {
+                        ctx.fillStyle = '#382a1e'; ctx.fillRect(this.x, this.y, this.w, this.h);
+                        ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeRect(this.x, this.y, this.w, this.h);
+                        ctx.fillStyle = '#aa8833'; ctx.beginPath(); ctx.arc(this.x + 15, this.y + 145, 5, 0, Math.PI*2); ctx.fill();
+                    }
+                },
+                {
+                    id: 'door_basement', type: 'door', x: 345, y: 115, w: 110, h: 275, target: 'basement',
+                    label: 'BASEMENT DOOR (BOARDED)',
+                    draw(ctx) {
+                        ctx.fillStyle = '#251c16'; ctx.fillRect(this.x, this.y, this.w, this.h);
+                        ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeRect(this.x, this.y, this.w, this.h);
+                        if (!Game.basementUnlocked) {
+                            // Wooden planks nailed across door
+                            ctx.fillStyle = '#6e4e2e';
+                            ctx.fillRect(this.x - 12, this.y + 70, this.w + 24, 24);
+                            ctx.strokeRect(this.x - 12, this.y + 70, this.w + 24, 24);
+                            ctx.fillRect(this.x - 12, this.y + 165, this.w + 24, 24);
+                            ctx.strokeRect(this.x - 12, this.y + 165, this.w + 24, 24);
+                        }
+                    }
+                },
+                {
+                    id: 'hall_bullets', type: 'task', taskCategory: 'repairs',
+                    x: 195, y: 165, w: 75, h: 65, reqItem: 'spackle', active: true,
+                    label: 'STRAY BULLET HOLES',
+                    desc: "9mm wall perforations. Patch 'em up with Spackle.",
+                    successMsg: "Drywall patched and smoothed over.",
+                    draw(ctx) { Art.drawBulletHoles(ctx, this.x, this.y, this.w, this.h); }
+                },
+                {
+                    id: 'hall_blood', type: 'task', taskCategory: 'blood',
+                    x: 210, y: 410, w: 125, h: 38, reqItem: 'mop', active: true,
+                    label: 'ARTERIAL DRAG TRAIL',
+                    desc: "Sticky crimson drag marks on the floorboards. Needs a clean Mop.",
+                    successMsg: "Drag trail mopped up.",
+                    draw(ctx) { Art.drawBloodSplatter(ctx, this.x, this.y, this.w, this.h); }
+                },
+                {
+                    id: 'hall_corpse', type: 'corpse', taskCategory: 'bodies',
+                    x: 495, y: 315, w: 95, h: 90, reqItem: 'bags', active: true, bagged: false,
+                    label: 'SLUMPED STICKMAN',
+                    desc: "Lookout didn't duck fast enough. Bag him and haul him to the incinerator.",
+                    draw(ctx) {
+                        if (!this.bagged) Art.drawDeadStick(ctx, this.x, this.y, 1, '#000');
+                        else Art.drawBodyBagFloor(ctx, this.x, this.y + 42, 95, 42);
+                    }
+                },
+                {
+                    id: 'hall_hidden_blood', type: 'task', taskCategory: 'blood',
+                    x: 495, y: 395, w: 95, h: 35, reqItem: 'mop', active: false,
+                    label: 'CORPSE BLOOD POOL',
+                    desc: "Leftover puddle where the body was sitting. Mop it.",
+                    successMsg: "Floor puddle scrubbed clean.",
+                    draw(ctx) { Art.drawBloodSplatter(ctx, this.x, this.y, this.w, this.h); }
+                }
+            ]
+        },
+
+        bathroom: {
+            name: "FILTHY BATHROOM",
+            bgDraw(ctx) {
+                // Grimy tile wall
+                ctx.fillStyle = '#2d3b3a';
+                ctx.fillRect(0, 0, 800, 390);
+                ctx.strokeStyle = '#222d2c';
+                ctx.lineWidth = 1;
+                for (let x = 0; x < 800; x += 32) {
+                    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 390); ctx.stroke();
+                }
+                for (let y = 0; y < 390; y += 32) {
+                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(800, y); ctx.stroke();
+                }
+                // Cracked Mirror
+                ctx.fillStyle = '#4a5d66';
+                ctx.strokeStyle = '#111';
+                ctx.lineWidth = 4;
+                ctx.fillRect(235, 95, 110, 90);
+                ctx.strokeRect(235, 95, 110, 90);
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(260, 95); ctx.lineTo(295, 145); ctx.lineTo(345, 130);
+                ctx.moveTo(295, 145); ctx.lineTo(280, 185);
+                ctx.stroke();
+
+                // Floor
+                ctx.fillStyle = '#1d2424';
+                ctx.fillRect(0, 390, 800, 90);
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(0, 390); ctx.lineTo(800, 390); ctx.stroke();
+            },
+            hotspots: [
+                {
+                    id: 'door_hall_from_bath', type: 'door', x: 40, y: 115, w: 90, h: 275, target: 'hallway',
+                    label: 'DOOR -> CORRIDOR',
+                    draw(ctx) {
+                        ctx.fillStyle = '#382a1e'; ctx.fillRect(this.x, this.y, this.w, this.h);
+                        ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeRect(this.x, this.y, this.w, this.h);
+                    }
+                },
+                {
+                    id: 'sink', type: 'sink', x: 240, y: 215, w: 100, h: 175, active: true,
+                    label: 'RUSTY UTILITY SINK',
+                    desc: "Running water. Click here with a blood-soaked Mop to rinse it out.",
+                    draw(ctx) {
+                        ctx.fillStyle = '#b8c2c2'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+                        ctx.fillRect(this.x, this.y, 100, 45);
+                        ctx.strokeRect(this.x, this.y, 100, 45);
+                        ctx.fillRect(this.x + 38, this.y + 45, 24, 130);
+                        ctx.strokeRect(this.x + 38, this.y + 45, 24, 130);
+                        // Faucet drip
+                        ctx.fillStyle = '#00ccff';
+                        const dy = (Game.animTime * 40) % 25;
+                        ctx.fillRect(this.x + 48, this.y - 8 + dy, 3, 6);
+                    }
+                },
+                {
+                    id: 'bath_blood', type: 'task', taskCategory: 'blood',
+                    x: 410, y: 315, w: 170, h: 75, reqItem: 'mop', active: true,
+                    label: 'BLOOD-STAINED BATHTUB',
+                    desc: "The porcelain is coated in red. Scrub it down with the Mop.",
+                    successMsg: "Bathtub scrubbed down to the enamel.",
+                    draw(ctx) {
+                        // Tub base
+                        ctx.fillStyle = '#c8cccc'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+                        ctx.fillRect(this.x, this.y, this.w, this.h);
+                        ctx.strokeRect(this.x, this.y, this.w, this.h);
+                        // Blood smear
+                        Art.drawBloodSplatter(ctx, this.x + 25, this.y + 10, 115, 42);
+                    }
+                },
+                {
+                    id: 'item_mop', type: 'item', x: 165, y: 245, w: 45, h: 155, active: true,
+                    label: 'JANITOR MOP',
+                    itemData: { id: 'mop', name: 'Janitor Mop' },
+                    draw(ctx) {
+                        ctx.strokeStyle = '#c89d54'; ctx.lineWidth = 5;
+                        ctx.beginPath(); ctx.moveTo(this.x + 22, this.y); ctx.lineTo(this.x + 22, this.y + 135); ctx.stroke();
+                        ctx.fillStyle = '#dcdcdc'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+                        ctx.fillRect(this.x + 4, this.y + 130, 36, 22);
+                        ctx.strokeRect(this.x + 4, this.y + 130, 36, 22);
+                    }
+                },
+                {
+                    id: 'item_bags', type: 'item', x: 615, y: 335, w: 65, h: 55, active: true,
+                    label: 'BIOHAZARD BODY BAGS',
+                    itemData: { id: 'bags', name: 'Body Bags' },
+                    draw(ctx) {
+                        ctx.fillStyle = '#151515'; ctx.strokeStyle = '#666'; ctx.lineWidth = 2.5;
+                        ctx.fillRect(this.x, this.y, this.w, this.h);
+                        ctx.strokeRect(this.x, this.y, this.w, this.h);
+                        ctx.fillStyle = '#ffcc00'; ctx.font = 'bold 11px Impact';
+                        ctx.fillText('BIO-BAGS', this.x + 9, this.y + 32);
+                    }
+                },
+                {
+                    id: 'item_spackle', type: 'item', x: 700, y: 340, w: 60, h: 50, active: true,
+                    label: 'WALL SPACKLE & PUTTY KNIFE',
+                    itemData: { id: 'spackle', name: 'Wall Spackle' },
+                    draw(ctx) {
+                        ctx.fillStyle = '#eee'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5;
+                        ctx.fillRect(this.x, this.y, 50, 48);
+                        ctx.strokeRect(this.x, this.y, 50, 48);
+                        ctx.fillStyle = '#dd2200';
+                        ctx.fillRect(this.x, this.y + 14, 50, 14);
+                    }
+                }
+            ]
+        },
+
+        livingroom: {
+            name: "TRASHED LIVING ROOM",
+            bgDraw(ctx) {
+                // Dingy brown walls
+                ctx.fillStyle = '#382a24';
+                ctx.fillRect(0, 0, 800, 390);
+                // Floor
+                ctx.fillStyle = '#261815';
+                ctx.fillRect(0, 390, 800, 90);
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(0, 390); ctx.lineTo(800, 390); ctx.stroke();
+
+                // Overturned Couch background prop
+                ctx.fillStyle = '#4f3b28'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+                ctx.fillRect(360, 290, 220, 100);
+                ctx.strokeRect(360, 290, 220, 100);
+                ctx.fillRect(345, 315, 25, 75);
+                ctx.strokeRect(345, 315, 25, 75);
+            },
+            hotspots: [
+                {
+                    id: 'door_hall_from_living', type: 'door', x: 35, y: 115, w: 90, h: 275, target: 'hallway',
+                    label: 'DOOR -> CORRIDOR',
+                    draw(ctx) {
+                        ctx.fillStyle = '#382a1e'; ctx.fillRect(this.x, this.y, this.w, this.h);
+                        ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeRect(this.x, this.y, this.w, this.h);
+                    }
+                },
+                {
+                    id: 'window_blinds', type: 'window', taskCategory: 'repairs',
+                    x: 185, y: 80, w: 140, h: 155, active: true,
+                    label: 'STREET WINDOW (CLICK TO SHUT BLINDS)',
+                    desc: "Wide open to the street! Click to pull the blinds down before cops patrol by!",
+                    draw(ctx) {
+                        // Night sky or flashing police cruisers
+                        if (Game.patrolActive > 0) {
+                            ctx.fillStyle = Math.floor(Game.animTime * 10) % 2 === 0 ? '#ff0000' : '#0033ff';
+                        } else {
+                            ctx.fillStyle = '#0d1424';
+                        }
+                        ctx.fillRect(this.x, this.y, this.w, this.h);
+                        ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
+                        ctx.strokeRect(this.x, this.y, this.w, this.h);
+
+                        if (Game.blindsClosed) {
+                            ctx.fillStyle = '#8c8275';
+                            ctx.fillRect(this.x + 3, this.y + 3, this.w - 6, this.h - 6);
+                            ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
+                            for (let by = this.y + 15; by < this.y + this.h; by += 14) {
+                                ctx.beginPath(); ctx.moveTo(this.x + 4, by); ctx.lineTo(this.x + this.w - 4, by); ctx.stroke();
+                            }
+                        } else {
+                            // Window panes
+                            ctx.beginPath();
+                            ctx.moveTo(this.x + this.w/2, this.y); ctx.lineTo(this.x + this.w/2, this.y + this.h);
+                            ctx.moveTo(this.x, this.y + this.h/2); ctx.lineTo(this.x + this.w, this.y + this.h/2);
+                            ctx.stroke();
+                        }
+                    }
+                },
+                {
+                    id: 'living_corpse', type: 'corpse', taskCategory: 'bodies',
+                    x: 420, y: 345, w: 105, h: 85, reqItem: 'bags', active: true, bagged: false,
+                    label: 'SPRAWLED STICKMAN',
+                    desc: "Took a dive off the sofa. Use Body Bags on him.",
+                    draw(ctx) {
+                        if (!this.bagged) Art.drawDeadStick(ctx, this.x, this.y, 2, '#102840');
+                        else Art.drawBodyBagFloor(ctx, this.x, this.y + 35, 100, 44);
+                    }
+                },
+                {
+                    id: 'living_hidden_blood', type: 'task', taskCategory: 'blood',
+                    x: 420, y: 410, w: 110, h: 36, reqItem: 'mop', active: false,
+                    label: 'CARPET BLOOD STAIN',
+                    desc: "Soaking into the rug under where the body was. Mop it now!",
+                    successMsg: "Rug stain bleached and mopped.",
+                    draw(ctx) { Art.drawBloodSplatter(ctx, this.x, this.y, this.w, this.h); }
+                },
+                {
+                    id: 'table_contraband', type: 'pickup_evidence', taskCategory: 'evidence',
+                    x: 205, y: 335, w: 85, h: 45, active: true,
+                    label: 'STASH BRIEFCASE & EVIDENCE',
+                    itemData: { id: 'contraband', name: 'Incriminating Stash' },
+                    draw(ctx) {
+                        ctx.fillStyle = '#c2a675'; ctx.strokeStyle = '#000'; ctx.lineWidth = 2.5;
+                        ctx.fillRect(this.x, this.y, 70, 38);
+                        ctx.strokeRect(this.x, this.y, 70, 38);
+                        ctx.fillStyle = '#cc0000'; ctx.font = 'bold 10px Courier';
+                        ctx.fillText('EVIDENCE', this.x + 8, this.y + 23);
+                    }
+                },
+                {
+                    id: 'item_crowbar', type: 'item', x: 645, y: 355, w: 85, h: 35, active: true,
+                    label: 'STEEL CROWBAR',
+                    itemData: { id: 'crowbar', name: 'Steel Crowbar' },
+                    draw(ctx) {
+                        ctx.strokeStyle = '#cc2222'; ctx.lineWidth = 6;
+                        ctx.beginPath();
+                        ctx.moveTo(this.x, this.y + 25);
+                        ctx.lineTo(this.x + 70, this.y + 5);
+                        ctx.arc(this.x + 73, this.y + 12, 7, Math.PI * 1.2, Math.PI * 0.3, false);
+                        ctx.stroke();
+                    }
+                },
+                {
+                    id: 'item_key', type: 'item', x: 525, y: 265, w: 40, h: 25, active: true,
+                    label: 'HEAVY BRASS KEY',
+                    itemData: { id: 'key', name: 'Safe Key' },
+                    draw(ctx) {
+                        ctx.strokeStyle = '#ffcc00'; ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.arc(this.x + 10, this.y + 12, 6, 0, Math.PI * 2);
+                        ctx.moveTo(this.x + 16, this.y + 12); ctx.lineTo(this.x + 34, this.y + 12);
+                        ctx.moveTo(this.x + 28, this.y + 12); ctx.lineTo(this.x + 28, this.y + 18);
+                        ctx.moveTo(this.x + 33, this.y + 12); ctx.lineTo(this.x + 33, this.y + 18);
+                        ctx.stroke();
+                    }
+                }
+            ]
+        },
+
+        basement: {
+            name: "BOILER BASEMENT",
+            bgDraw(ctx) {
+                // Concrete bunker walls
+                ctx.fillStyle = '#1e1e22';
+                ctx.fillRect(0, 0, 800, 390);
+                // Brick texture lines
+                ctx.strokeStyle = '#151518'; ctx.lineWidth = 2;
+                for (let y = 40; y < 390; y += 40) {
+                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(800, y); ctx.stroke();
+                }
+                // Floor
+                ctx.fillStyle = '#141416';
+                ctx.fillRect(0, 390, 800, 90);
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(0, 390); ctx.lineTo(800, 390); ctx.stroke();
+            },
+            hotspots: [
+                {
+                    id: 'door_hall_from_base', type: 'door', x: 40, y: 115, w: 90, h: 275, target: 'hallway',
+                    label: 'STAIRS -> CORRIDOR',
+                    draw(ctx) {
+                        ctx.fillStyle = '#251c16'; ctx.fillRect(this.x, this.y, this.w, this.h);
+                        ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeRect(this.x, this.y, this.w, this.h);
+                    }
+                },
+                {
+                    id: 'incinerator', type: 'incinerator', x: 555, y: 120, w: 190, h: 270, active: true,
+                    label: 'INDUSTRIAL INCINERATOR',
+                    desc: "Roaring at 1,800 degrees. Drop Bagged Bodies and Contraband in here to erase them forever.",
+                    draw(ctx) {
+                        // Furnace body
+                        ctx.fillStyle = '#332d2d'; ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
+                        ctx.fillRect(this.x, this.y, this.w, this.h);
+                        ctx.strokeRect(this.x, this.y, this.w, this.h);
+                        // Fire grate window
+                        const glow = 0.7 + Math.sin(Game.animTime * 10) * 0.25;
+                        ctx.fillStyle = `rgba(255, 90, 0, ${glow})`;
+                        ctx.fillRect(this.x + 30, this.y + 65, this.w - 60, 95);
+                        ctx.strokeRect(this.x + 30, this.y + 65, this.w - 60, 95);
+                        // Grate bars
+                        for (let gx = this.x + 50; gx < this.x + this.w - 40; gx += 25) {
+                            ctx.beginPath(); ctx.moveTo(gx, this.y + 65); ctx.lineTo(gx, this.y + 160); ctx.stroke();
+                        }
+                        ctx.fillStyle = '#ffcc00'; ctx.font = 'bold 12px Courier';
+                        ctx.fillText('INCINERATOR', this.x + 50, this.y + 35);
+                    }
+                },
+                {
+                    id: 'wall_safe', type: 'safe', taskCategory: 'evidence',
+                    x: 245, y: 165, w: 110, h: 110, reqItem: 'key', active: true,
+                    label: 'WALL SAFE (LOCKED)',
+                    desc: "Contains client ledger tapes. Unlock it with the Brass Key!",
+                    draw(ctx) {
+                        ctx.fillStyle = '#444b52'; ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
+                        ctx.fillRect(this.x, this.y, this.w, this.h);
+                        ctx.strokeRect(this.x, this.y, this.w, this.h);
+                        // Dial
+                        ctx.fillStyle = '#222';
+                        ctx.beginPath(); ctx.arc(this.x + 55, this.y + 55, 18, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                    }
+                }
+            ]
+        }
+    };
+}
+
+// --- PROGRESS & TASK CALCULATION ---
+function getRemainingCounts() {
+    let bodies = 0, blood = 0, evidence = 0, repairs = 0;
+
+    for (const rKey in Rooms) {
+        Rooms[rKey].hotspots.forEach(h => {
+            if (h.type === 'corpse' && h.active) bodies++;
+            if (h.taskCategory === 'blood' && h.active) blood++;
+            if (h.taskCategory === 'evidence' && h.active) evidence++;
+            if (h.taskCategory === 'repairs' && h.id === 'hall_bullets' && h.active) repairs++;
+        });
+    }
+    if (!Game.blindsClosed) repairs++;
+    if (Game.inventory.some(i => i.id === 'filled_bag')) bodies++;
+    if (Game.inventory.some(i => i.id === 'contraband')) evidence++;
+
+    const totalRemaining = bodies + blood + evidence + repairs;
+    return { bodies, blood, evidence, repairs, totalRemaining };
+}
+
+// --- INTERACTION HANDLER ---
+function interact(h) {
+    const tool = Game.selectedItem ? Game.selectedItem.id : null;
+
+    // 1. DOORS
+    if (h.type === 'door') {
+        if (h.id === 'door_basement' && !Game.basementUnlocked) {
+            if (tool === 'crowbar') {
+                Game.basementUnlocked = true;
+                h.label = 'DOOR -> BASEMENT';
+                Game.score += 150;
+                SFX.play('crowbar');
+                setCaption("Pried the planks off the Basement door!", "#00ff00");
+            } else {
+                SFX.play('error');
+                setCaption("Boarded shut with heavy nails. Need a Crowbar.", "#ff5555");
+            }
+            return;
+        }
+        SFX.play('click');
+        Game.currentRoom = h.target;
+        setCaption(`Entered: ${Rooms[h.target].name}`, "#cccccc", 2);
+        return;
+    }
+
+    // 2. TOOL PICKUPS
+    if (h.type === 'item' && h.active) {
+        h.active = false;
+        addItem(h.itemData);
+        Game.selectedItem = h.itemData;
+        SFX.play('pickup');
+        setCaption(`Equipped: ${h.itemData.name}`, "#00ff00");
+        return;
+    }
+
+    // 3. EVIDENCE PICKUPS
+    if (h.type === 'pickup_evidence' && h.active) {
+        h.active = false;
+        addItem(h.itemData);
+        Game.selectedItem = h.itemData;
+        SFX.play('pickup');
+        setCaption("Picked up Incriminating Stash! Burn it in the Basement Incinerator.", "#ffcc00");
+        return;
+    }
+
+    // 4. BATHROOM SINK (Rinsing Mop)
+    if (h.type === 'sink') {
+        if (tool === 'mop') {
+            if (Game.mopDirtiness > 0) {
+                Game.mopDirtiness = 0;
+                SFX.play('scrub');
+                setCaption("Rinsed the blood out of the Mop. Good as new!", "#00ffff");
+            } else {
+                SFX.play('click');
+                setCaption("The mop is already clean.", "#cccccc");
+            }
+        } else {
+            SFX.play('click');
+            setCaption(h.desc, "#cccccc");
+        }
+        return;
+    }
+
+    // 5. LIVING ROOM WINDOW BLINDS
+    if (h.type === 'window') {
+        if (!Game.blindsClosed) {
+            Game.blindsClosed = true;
+            h.label = 'STREET WINDOW (BLINDS SHUT)';
+            Game.score += 200;
+            SFX.play('click');
+            setCaption("Shut the street blinds. Cops can't peer inside anymore!", "#00ff00");
+        } else {
+            setCaption("Leave the blinds shut! You don't want witnesses.", "#cccccc");
+        }
+        return;
+    }
+
+    // 6. CORPSES (Two-step: Bag with Body Bags -> Pick up Filled Bag -> Burn in Incinerator)
+    if (h.type === 'corpse' && h.active) {
+        if (!h.bagged) {
+            if (tool === 'bags') {
+                h.bagged = true;
+                h.label = 'BAGGED CORPSE (CLICK TO HAUL)';
+                Game.score += 250;
+                SFX.play('bag');
+                setCaption("Body zipped up! Click the bag to haul it, and mop the blood underneath!", "#00ff00");
+                // Reveal blood pool underneath!
+                const room = Rooms[Game.currentRoom];
+                const hiddenBlood = room.hotspots.find(s => s.id.includes('hidden_blood'));
+                if (hiddenBlood) hiddenBlood.active = true;
+            } else {
+                SFX.play('error');
+                setCaption(h.desc, "#ff6666");
+            }
+        } else {
+            // Pick up the bagged corpse
+            if (Game.inventory.some(i => i.id === 'filled_bag')) {
+                SFX.play('error');
+                setCaption("You're already carrying a heavy body bag! Incinerate it first!", "#ff5555");
+            } else {
+                h.active = false;
+                const bagItem = { id: 'filled_bag', name: 'Bagged Corpse' };
+                addItem(bagItem);
+                Game.selectedItem = bagItem;
+                SFX.play('pickup');
+                setCaption("Hauling Bagged Corpse. Dump it in the Basement Incinerator!", "#ffcc00");
+            }
+        }
+        return;
+    }
+
+    // 7. WALL SAFE IN BASEMENT
+    if (h.type === 'safe' && h.active) {
+        if (tool === 'key') {
+            h.active = false;
+            removeItem('key');
+            Game.score += 300;
+            SFX.play('crowbar');
+            const stashItem = { id: 'contraband', name: 'Incriminating Stash' };
+            addItem(stashItem);
+            Game.selectedItem = stashItem;
+            setCaption("Unlocked Wall Safe & grabbed the Ledger Tapes! Toss 'em in the Incinerator!", "#00ff00");
+        } else {
+            SFX.play('error');
+            setCaption(h.desc, "#ff6666");
+        }
+        return;
+    }
+
+    // 8. INCINERATOR (Destroys Bagged Bodies & Contraband)
+    if (h.type === 'incinerator') {
+        if (tool === 'filled_bag' || tool === 'contraband') {
+            const burnedName = Game.selectedItem.name;
+            removeItem(tool);
+            Game.score += 400;
+            SFX.play('burn');
+            setCaption(`Incinerated ${burnedName}! Zero forensic trace left.`, "#00ff00");
+        } else {
+            SFX.play('click');
+            setCaption(h.desc, "#ffcc00");
+        }
+        return;
+    }
+
+    // 9. STANDARD TASKS (Blood & Bullet Holes)
+    if (h.type === 'task' && h.active) {
+        if (!tool) {
+            SFX.play('click');
+            setCaption(h.desc, "#ffcc00");
+            return;
+        }
+        if (tool === h.reqItem) {
+            if (tool === 'mop') {
+                if (Game.mopDirtiness >= 2) {
+                    SFX.play('error');
+                    setCaption("Mop is dripping with blood! Rinse it in the Bathroom Sink first!", "#ff3333");
+                    return;
+                }
+                Game.mopDirtiness++;
+            }
+            h.active = false;
+            Game.score += 250;
+            SFX.play('scrub');
+            const mopNote = (tool === 'mop' && Game.mopDirtiness >= 2) ? " (Mop is soaked! Rinse in sink!)" : "";
+            setCaption(h.successMsg + mopNote, "#00ff00");
+        } else {
+            SFX.play('error');
+            setCaption("Wrong tool for the job.", "#ff4444");
+        }
+    }
+}
+
+// --- RESET GAME ---
+function startNewGame() {
+    initRooms();
+    Game.state = 'PLAYING';
+    Game.currentRoom = 'hallway';
+    Game.timeLeft = 180;
+    Game.score = 0;
+    Game.heat = 0;
+    Game.patrolTimer = 25;
+    Game.patrolActive = 0;
+    Game.blindsClosed = false;
+    Game.basementUnlocked = false;
+    Game.mopDirtiness = 0;
+    Game.inventory = [];
+    Game.selectedItem = null;
+    setCaption("Dispatcher: You have 3:00 minutes before SWAT breaches. Clean EVERYTHING.", "#00ff00", 5);
+    SFX.play('click');
+}
+
+// --- UPDATE LOOP ---
+let lastTimestamp = 0;
+
+function update(dt) {
+    Game.animTime += dt;
+
+    if (Input.rightClick) {
+        Game.selectedItem = null;
+        Input.rightClick = false;
+    }
+
+    if (Game.state === 'MENU') {
+        if (Input.leftClick) {
+            Input.leftClick = false;
+            startNewGame();
+        }
+        return;
+    }
+
+    if (Game.state === 'GAMEOVER' || Game.state === 'VICTORY') {
+        if (Input.leftClick) {
+            Input.leftClick = false;
+            Game.state = 'MENU';
+            SFX.play('click');
+        }
+        return;
+    }
+
+    // --- PLAYING STATE ---
+    Game.timeLeft -= dt;
+    if (Game.timeLeft <= 0) {
+        Game.timeLeft = 0;
+        Game.state = 'GAMEOVER';
+        Game.failReason = "TIME EXPIRED — SWAT BREACHED THE FRONT DOOR.";
+        SFX.play('siren');
+        return;
+    }
+
+    if (Game.captionTimer > 0) Game.captionTimer -= dt;
+
+    // Police Patrol Check
+    Game.patrolTimer -= dt;
+    if (Game.patrolTimer <= 0) {
+        Game.patrolTimer = 28;
+        Game.patrolActive = 4.5;
+        SFX.play('siren');
+        if (!Game.blindsClosed) {
+            Game.heat = Math.min(100, Game.heat + 50);
+            setCaption("COP CRUISER SPOTTED OPEN LIVING ROOM WINDOW! HEAT +50%!", "#ff2222", 4);
+            if (Game.heat >= 100) {
+                Game.state = 'GAMEOVER';
+                Game.failReason = "100% POLICE HEAT — PATROL CAR SAW INSIDE THE OPEN WINDOW!";
+                return;
+            }
+        } else {
+            setCaption("Police cruiser drove past... Blinds kept them from seeing inside.", "#00ffff", 3.5);
+        }
+    }
+    if (Game.patrolActive > 0) Game.patrolActive -= dt;
+
+    // Check Victory
+    const counts = getRemainingCounts();
+    if (counts.totalRemaining === 0) {
+        Game.state = 'VICTORY';
+        SFX.play('win');
+        return;
+    }
+
+    // Hover Detection inside Room View (y < 480)
+    const room = Rooms[Game.currentRoom];
+    Input.hovered = null;
+    if (Input.y < 480) {
+        for (let i = room.hotspots.length - 1; i >= 0; i--) {
+            const h = room.hotspots[i];
+            if (h.active || h.type === 'door' || h.type === 'window' || h.type === 'sink' || h.type === 'incinerator') {
+                if (Input.x >= h.x && Input.x <= h.x + h.w && Input.y >= h.y && Input.y <= h.y + h.h) {
+                    Input.hovered = h;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Click Handling
+    if (Input.leftClick) {
+        Input.leftClick = false;
+        if (Input.y < 480 && Input.hovered) {
+            interact(Input.hovered);
+        } else if (Input.y >= 480) {
+            // Inventory Bar Clicks
+            for (let i = 0; i < 6; i++) {
+                const sx = 18 + i * 62;
+                const sy = 522;
+                if (Input.x >= sx && Input.x <= sx + 54 && Input.y >= sy && Input.y <= sy + 54) {
+                    if (i < Game.inventory.length) {
+                        Game.selectedItem = Game.inventory[i];
+                        SFX.play('click');
+                        setCaption(`Equipped: ${Game.selectedItem.name}`, "#00ff00", 2);
+                    } else {
+                        Game.selectedItem = null;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --- RENDERING ENGINE ---
+function drawCustomCursor() {
+    const x = Input.x;
+    const y = Input.y;
+    ctx.save();
+
+    // Draw equipped tool icon floating next to cursor
+    if (Game.selectedItem && Game.state === 'PLAYING') {
+        Art.drawIcon(ctx, Game.selectedItem.id, x + 10, y + 10, 32);
+    }
+
+    // Crosshair
+    const isHover = Boolean(Input.hovered) && Game.state === 'PLAYING';
+    ctx.strokeStyle = isHover ? '#00ff00' : '#ff1111';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y, isHover ? 11 : 8, 0, Math.PI * 2);
+    ctx.moveTo(x - 15, y); ctx.lineTo(x - 4, y);
+    ctx.moveTo(x + 4, y); ctx.lineTo(x + 15, y);
+    ctx.moveTo(x, y - 15); ctx.lineTo(x, y - 4);
+    ctx.moveTo(x, y + 4); ctx.lineTo(x, y + 15);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (Game.state === 'MENU') {
+        ctx.fillStyle = '#070707';
+        ctx.fillRect(0, 0, 800, 600);
+
+        // Animated Blood Drips at top
+        ctx.fillStyle = '#990000';
+        ctx.fillRect(0, 0, 800, 18);
+        Game.bloodDrips.forEach(d => {
+            d.len = (d.len + d.speed * 0.016) % 180;
+            ctx.beginPath();
+            ctx.fillRect(d.x, 15, 6, d.len);
+            ctx.arc(d.x + 3, 15 + d.len, 5, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Title Logo
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ff0000';
+        ctx.font = 'bold 58px Impact, Arial Black, sans-serif';
+        ctx.fillText("SAFEHOUSE SCRUBBER", 400, 155);
+        ctx.fillStyle = '#00ff00';
+        ctx.font = 'bold 16px Courier New';
+        ctx.fillText("=== AN ORIGINAL STICK-FIGURE CRIME CLEANUP GAME ===", 400, 188);
+
+        // Mascot Stick Cleaner Preview
+        Art.drawDeadStick(ctx, 355, 215, 1, '#333');
+
+        // Mission Briefing Box
+        ctx.fillStyle = '#141414';
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 3;
+        ctx.fillRect(130, 320, 540, 175);
+        ctx.strokeRect(130, 320, 540, 175);
+
+        ctx.fillStyle = '#ffcc00';
+        ctx.font = 'bold 15px Courier New';
+        ctx.fillText("CONTRACT RULES OF ENGAGEMENT:", 400, 348);
+        ctx.fillStyle = '#ddd';
+        ctx.font = '13px Courier New';
+        ctx.fillText("1. Shut the Living Room blinds before Police Cruisers spot inside.", 400, 376);
+        ctx.fillText("2. Zip up all Stick Corpses in Bio-Bags, then mop the blood underneath.", 400, 400);
+        ctx.fillText("3. Rinse your blood-soaked Mop in the Bathroom Sink when it fills up.", 400, 424);
+        ctx.fillText("4. Pry open the Basement & burn all Body Bags and Safe Contraband.", 400, 448);
+        ctx.fillText("5. Spackle over stray bullet holes before the 3:00 timer hits zero.", 400, 472);
+
+        // Blinking Start Prompt
+        if (Math.floor(Game.animTime * 2.5) % 2 === 0) {
+            ctx.fillStyle = '#00ff00';
+            ctx.font = 'bold 24px Impact, sans-serif';
+            ctx.fillText(">>> CLICK ANYWHERE TO START CONTRACT <<<", 400, 550);
+        }
+
+        drawCustomCursor();
+        return;
+    }
+
+    if (Game.state === 'PLAYING') {
+        const room = Rooms[Game.currentRoom];
+
+        // 1. Draw Room Background
+        room.bgDraw(ctx);
+
+        // 2. Draw Room Hotspots
+        room.hotspots.forEach(h => {
+            if (h.active || h.type === 'door' || h.type === 'window' || h.type === 'sink' || h.type === 'incinerator') {
+                h.draw(ctx);
+
+                // Hover Highlight Box
+                if (Input.hovered === h) {
+                    ctx.save();
+                    ctx.strokeStyle = '#00ff00';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 3]);
+                    ctx.strokeRect(h.x - 4, h.y - 4, h.w + 8, h.h + 8);
+                    ctx.restore();
+                }
+            }
+        });
+
+        // 3. Room Name Banner (Top Left)
+        ctx.fillStyle = 'rgba(0,0,0,0.75)';
+        ctx.fillRect(10, 10, 240, 28);
+        ctx.strokeStyle = '#555';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(10, 10, 240, 28);
+        ctx.fillStyle = '#00ff00';
+        ctx.font = 'bold 14px Courier New';
+        ctx.textAlign = 'left';
+        ctx.fillText(`LOC: ${room.name}`, 20, 29);
+
+        // Hover Tooltip Banner (Top Center)
+        if (Input.hovered) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillRect(265, 10, 310, 28);
+            ctx.strokeStyle = '#00ff00';
+            ctx.strokeRect(265, 10, 310, 28);
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 13px Courier New';
+            ctx.fillText(Input.hovered.label, 420, 29);
+        }
+
+        // 4. Flavor Caption Strip (Bottom of Viewport)
+        if (Game.captionTimer > 0) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillRect(0, 448, 800, 32);
+            ctx.fillStyle = Game.captionColor;
+            ctx.font = 'bold 14px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText(Game.caption, 400, 469);
+        }
+
+        // 5. Classic Beveled HUD Bar (y: 480 -> 600)
+        ctx.fillStyle = '#161616';
+        ctx.fillRect(0, 480, 800, 120);
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(2, 482, 796, 116);
+
+        // Inventory Slots
+        ctx.fillStyle = '#aaa';
+        ctx.font = 'bold 12px Courier New';
+        ctx.textAlign = 'left';
+        const mopStatus = Game.inventory.some(i => i.id === 'mop')
+            ? ` | MOP DIRT: ${Game.mopDirtiness}/2`
+            : '';
+        ctx.fillText(`TOOLBELT [R-CLICK UNEQUIP]${mopStatus}`, 18, 508);
+
+        for (let i = 0; i < 6; i++) {
+            const sx = 18 + i * 62;
+            const sy = 520;
+            ctx.fillStyle = '#080808';
+            ctx.fillRect(sx, sy, 54, 54);
+            const item = Game.inventory[i];
+            const isSelected = item && Game.selectedItem && Game.selectedItem.id === item.id;
+            ctx.strokeStyle = isSelected ? '#00ff00' : '#444';
+            ctx.lineWidth = isSelected ? 3 : 2;
+            ctx.strokeRect(sx, sy, 54, 54);
+
+            if (item) {
+                Art.drawIcon(ctx, item.id, sx + 7, sy + 7, 40);
+            }
+        }
+
+        // Cleaner's Pager Checklist (Middle HUD)
+        const counts = getRemainingCounts();
+        ctx.fillStyle = '#0c1a0c';
+        ctx.fillRect(405, 494, 195, 92);
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(405, 494, 195, 92);
+
+        ctx.fillStyle = '#00ff00';
+        ctx.font = 'bold 12px Courier New';
+        ctx.fillText("PAGER // TASKS LEFT:", 415, 512);
+        ctx.font = '12px Courier New';
+        ctx.fillStyle = counts.bodies === 0 ? '#447744' : '#88ff88';
+        ctx.fillText(`- Bodies to Burn: ${counts.bodies}`, 415, 531);
+        ctx.fillStyle = counts.blood === 0 ? '#447744' : '#88ff88';
+        ctx.fillText(`- Blood Stains:   ${counts.blood}`, 415, 548);
+        ctx.fillStyle = counts.evidence === 0 ? '#447744' : '#88ff88';
+        ctx.fillText(`- Evidence Stash: ${counts.evidence}`, 415, 565);
+        ctx.fillStyle = counts.repairs === 0 ? '#447744' : '#88ff88';
+        ctx.fillText(`- Wall/Window:    ${counts.repairs}`, 415, 582);
+
+        // Timer, Heat & Score (Right HUD)
+        const mins = Math.floor(Game.timeLeft / 60);
+        const secs = Math.floor(Game.timeLeft % 60).toString().padStart(2, '0');
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 20px Courier New';
+        ctx.fillStyle = Game.timeLeft < 40 ? '#ff2222' : '#ffffff';
+        ctx.fillText(`SWAT: 0${mins}:${secs}`, 620, 518);
+
+        ctx.font = 'bold 14px Courier New';
+        ctx.fillStyle = Game.heat > 0 ? '#ff4444' : '#aaa';
+        ctx.fillText(`HEAT: ${Game.heat}%`, 620, 546);
+
+        ctx.fillStyle = '#ffcc00';
+        ctx.fillText(`CASH: $${Game.score}`, 620, 574);
+
+        drawCustomCursor();
+        return;
+    }
+
+    if (Game.state === 'GAMEOVER') {
+        ctx.fillStyle = '#120000';
+        ctx.fillRect(0, 0, 800, 600);
+
+        // Flashing Police Strobe Bars
+        ctx.fillStyle = Math.floor(Game.animTime * 8) % 2 === 0 ? '#cc0000' : '#0022cc';
+        ctx.fillRect(0, 0, 800, 25);
+        ctx.fillRect(0, 575, 800, 25);
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ff1111';
+        ctx.font = 'bold 64px Impact, sans-serif';
+        ctx.fillText("BUSTED BY SWAT", 400, 210);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 18px Courier New';
+        ctx.fillText(Game.failReason, 400, 270);
+
+        ctx.fillStyle = '#ffcc00';
+        ctx.font = '16px Courier New';
+        ctx.fillText(`Cash Earned Before Arrest: $${Game.score}`, 400, 330);
+
+        ctx.fillStyle = '#00ff00';
+        ctx.font = 'bold 22px Courier New';
+        ctx.fillText("[ CLICK ANYWHERE TO RETURN TO MENU ]", 400, 430);
+
+        drawCustomCursor();
+        return;
+    }
+
+    if (Game.state === 'VICTORY') {
+        ctx.fillStyle = '#051205';
+        ctx.fillRect(0, 0, 800, 600);
+
+        const timeBonus = Math.floor(Game.timeLeft) * 15;
+        const heatPenalty = Game.heat * 5;
+        const totalPay = Game.score + timeBonus - heatPenalty;
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#00ff00';
+        ctx.font = 'bold 60px Impact, sans-serif';
+        ctx.fillText("SCENE SANITIZED", 400, 170);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 18px Courier New';
+        ctx.fillText("SWAT raided an empty, spotless building. Not a single clue found.", 400, 225);
+
+        ctx.fillStyle = '#112211';
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 3;
+        ctx.fillRect(200, 260, 400, 170);
+        ctx.strokeRect(200, 260, 400, 170);
+
+        ctx.fillStyle = '#ffcc00';
+        ctx.font = 'bold 17px Courier New';
+        ctx.fillText(`Base Cleanup Pay:   $${Game.score}`, 400, 300);
+        ctx.fillText(`Speed Bonus:       +$${timeBonus}`, 400, 330);
+        ctx.fillText(`Police Heat Cut:   -$${heatPenalty}`, 400, 360);
+        ctx.fillStyle = '#00ff00';
+        ctx.font = 'bold 22px Courier New';
+        ctx.fillText(`FINAL PAYOUT:      $${totalPay}`, 400, 405);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 20px Courier New';
+        ctx.fillText("[ CLICK ANYWHERE FOR NEXT CONTRACT ]", 400, 500);
+
+        drawCustomCursor();
+    }
+}
+
+function loop(timestamp) {
+    if (!lastTimestamp) lastTimestamp = timestamp;
+    const dt = Math.min(0.1, (timestamp - lastTimestamp) / 1000);
+    lastTimestamp = timestamp;
+
+    update(dt);
+    draw();
+    requestAnimationFrame(loop);
+}
+
+initRooms();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
